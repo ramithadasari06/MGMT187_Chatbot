@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -11,26 +12,35 @@
   }
 }
 
+/* Custom overrides for the prose class to match the app's aesthetic */
 .prose {
-  @apply text-[#4A4A4A];
+  --tw-prose-body: #4A4A4A;
+  --tw-prose-headings: #141414;
+  --tw-prose-bold: #141414;
+  --tw-prose-bullets: #D1D1D1;
+  --tw-prose-quotes: #141414;
+  --tw-prose-code: #141414;
+  --tw-prose-links: #141414;
 }
 
-.prose strong {
-  @apply text-[#141414] font-bold;
-}
-
-.prose h1, .prose h2, .prose h3 {
-  @apply text-[#141414] font-bold tracking-tight;
+.prose-invert {
+  --tw-prose-body: #FFFFFF;
+  --tw-prose-headings: #FFFFFF;
+  --tw-prose-bold: #FFFFFF;
+  --tw-prose-bullets: #4A4A4A;
+  --tw-prose-quotes: #FFFFFF;
+  --tw-prose-code: #FFFFFF;
+  --tw-prose-links: #FFFFFF;
 }
 
 .prose ul {
-  @apply list-disc pl-4 space-y-1;
+  @apply list-disc pl-4 space-y-1 my-2;
 }
 
 .prose ol {
-  @apply list-decimal pl-4 space-y-1;
+  @apply list-decimal pl-4 space-y-1 my-2;
 }
 
-.prose code {
-  @apply bg-[#F5F5F5] px-1 py-0.5 rounded text-xs font-mono text-[#141414];
+.prose p {
+  @apply my-2 first:mt-0 last:mb-0;
 }

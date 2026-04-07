@@ -16,6 +16,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { GoogleGenAI } from "@google/genai";
 import { cn } from './lib/utils';
 import { SYSTEM_PROMPT } from './constants';
@@ -249,8 +253,16 @@ export default function App() {
                       "max-w-[85%] p-4 rounded-2xl shadow-sm",
                       msg.role === 'assistant' ? "bg-white text-[#141414]" : "bg-[#141414] text-white"
                     )}>
-                      <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-headings:mb-2 prose-headings:mt-4">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <div className={cn(
+                        "prose prose-sm max-w-none prose-p:leading-relaxed prose-headings:mb-2 prose-headings:mt-4",
+                        msg.role === 'user' ? "prose-invert" : ""
+                      )}>
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkBreaks, remarkMath]} 
+                          rehypePlugins={[rehypeKatex]}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
                       </div>
                     </div>
                   </div>
