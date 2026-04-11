@@ -50,13 +50,23 @@ export default function App() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (retryMessage?: string) => {
+    if ((!input.trim() && !retryMessage) || isLoading) return;
 
-    const userMessage = input.trim();
-    const newMessages = [...messages, { role: 'user', content: userMessage } as Message];
-    setMessages(newMessages);
-    setInput('');
+    const userMessage = retryMessage || input.trim();
+    let newMessages = messages;
+    
+    if (retryMessage) {
+      // Remove the last assistant message (the error) if retrying
+      if (messages[messages.length - 1].role === 'assistant') {
+        newMessages = messages.slice(0, -1);
+      }
+    } else {
+      newMessages = [...messages, { role: 'user', content: userMessage } as Message];
+      setMessages(newMessages);
+      setInput('');
+    }
+    
     setIsLoading(true);
 
     try {
@@ -68,13 +78,17 @@ export default function App() {
         ? SYSTEM_PROMPT + "\n\nACT IN TUTOR MODE: Focus on practice questions, explanations, and study strategies." 
         : SYSTEM_PROMPT;
 
+      // Limit history to last 15 messages to save tokens and avoid quota issues
+      const historyLimit = 15;
+      const recentMessages = newMessages.slice(-historyLimit);
+
       const result = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3-flash-preview",
         config: {
           systemInstruction: systemInstruction,
         },
         contents: [
-          ...messages.filter((m, idx) => !(idx === 0 && m.role === 'assistant')).map((m) => ({
+          ...recentMessages.filter((m, idx) => !(idx === 0 && m.role === 'assistant' && newMessages.length > historyLimit)).map((m) => ({
             role: m.role === "user" ? "user" : "model",
             parts: [{ text: m.content }]
           })),
@@ -89,10 +103,14 @@ export default function App() {
       console.error("Gemini API Error:", error);
       let errorMessage = "I'm sorry, I encountered an error. ";
       
-      if (error.message?.includes("API key not valid")) {
+      const errorString = typeof error === 'string' ? error : (error.message || JSON.stringify(error));
+
+      if (errorString.includes("API key not valid")) {
         errorMessage += "The API key appears to be invalid. Please check your configuration.";
-      } else if (error.message?.includes("Rpc failed")) {
-        errorMessage += "There was a connection issue with the AI service. This might be temporary, please try again.";
+      } else if (errorString.includes("RESOURCE_EXHAUSTED") || errorString.includes("429")) {
+        errorMessage += "The AI service is currently at its limit (Quota Exceeded). Please wait a moment before trying again, or check your API usage limits.";
+      } else if (errorString.includes("Rpc failed") || errorString.includes("xhr error") || errorString.includes("code: 500")) {
+        errorMessage += "There was a temporary connection issue with the AI service (RPC/XHR error). This is usually a transient server-side issue. Please wait a few seconds and try your request again.";
       } else {
         errorMessage += error.message || "Please try again later.";
       }
@@ -113,12 +131,12 @@ export default function App() {
   ];
 
   return (
-    <div className="flex h-screen bg-[#F5F5F5] font-sans text-[#141414]">
+    <div className="flex h-screen bg-[#F5F5F5] font-sans text-[#0065cc]">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-[#E5E5E5] flex flex-col">
         <div className="p-6 border-bottom border-[#E5E5E5]">
           <div className="flex items-center gap-2 mb-2">
-            <div className="bg-[#141414] p-1.5 rounded-lg">
+            <div className="bg-[#0065cc] p-1.5 rounded-lg">
               <Bot className="w-5 h-5 text-white" />
             </div>
             <h1 className="font-bold text-lg tracking-tight">AI Assistant</h1>
@@ -131,7 +149,7 @@ export default function App() {
             onClick={() => setActiveTab('chat')}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
-              activeTab === 'chat' ? "bg-[#141414] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
+              activeTab === 'chat' ? "bg-[#0065cc] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
             )}
           >
             <MessageSquare className="w-5 h-5" />
@@ -141,7 +159,7 @@ export default function App() {
             onClick={() => setActiveTab('modules')}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
-              activeTab === 'modules' ? "bg-[#141414] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
+              activeTab === 'modules' ? "bg-[#0065cc] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
             )}
           >
             <BookOpen className="w-5 h-5" />
@@ -151,7 +169,7 @@ export default function App() {
             onClick={() => setActiveTab('timeline')}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
-              activeTab === 'timeline' ? "bg-[#141414] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
+              activeTab === 'timeline' ? "bg-[#0065cc] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
             )}
           >
             <LayoutDashboard className="w-5 h-5" />
@@ -161,7 +179,7 @@ export default function App() {
             onClick={() => setActiveTab('project')}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
-              activeTab === 'project' ? "bg-[#141414] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
+              activeTab === 'project' ? "bg-[#0065cc] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
             )}
           >
             <Sparkles className="w-5 h-5" />
@@ -171,7 +189,7 @@ export default function App() {
             onClick={() => setActiveTab('logistics')}
             className={cn(
               "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all",
-              activeTab === 'logistics' ? "bg-[#141414] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
+              activeTab === 'logistics' ? "bg-[#0065cc] text-white shadow-lg" : "hover:bg-[#F0F0F0] text-[#4A4A4A]"
             )}
           >
             <Info className="w-5 h-5" />
@@ -210,7 +228,7 @@ export default function App() {
       <main className="flex-1 flex flex-col relative overflow-hidden">
         <header className="h-16 bg-white border-b border-[#E5E5E5] flex items-center justify-between px-8 z-10">
           <div className="flex items-center gap-4">
-            <h2 className="font-semibold text-[#141414]">
+            <h2 className="font-semibold text-[#0065cc]">
               {activeTab === 'chat' && "Intelligent Tutoring"}
               {activeTab === 'modules' && "Course Curriculum"}
               {activeTab === 'timeline' && "Semester Timeline"}
@@ -224,7 +242,7 @@ export default function App() {
             )}
           </div>
           <div className="flex items-center gap-4 text-[#9E9E9E]">
-            <HelpCircle className="w-5 h-5 cursor-pointer hover:text-[#141414] transition-colors" />
+            <HelpCircle className="w-5 h-5 cursor-pointer hover:text-[#0065cc] transition-colors" />
           </div>
         </header>
 
@@ -245,13 +263,13 @@ export default function App() {
                   )}>
                     <div className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
-                      msg.role === 'assistant' ? "bg-[#141414] text-white" : "bg-white border border-[#E5E5E5]"
+                      msg.role === 'assistant' ? "bg-[#0065cc] text-white" : "bg-white border border-[#E5E5E5]"
                     )}>
                       {msg.role === 'assistant' ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
                     </div>
                     <div className={cn(
-                      "max-w-[85%] p-4 rounded-2xl shadow-sm",
-                      msg.role === 'assistant' ? "bg-white text-[#141414]" : "bg-[#141414] text-white"
+                      "max-w-[85%] p-4 rounded-2xl shadow-sm relative group",
+                      msg.role === 'assistant' ? "bg-white text-[#0065cc]" : "bg-[#0065cc] text-white"
                     )}>
                       <div className={cn(
                         "prose prose-sm max-w-none prose-p:leading-relaxed prose-headings:mb-2 prose-headings:mt-4",
@@ -264,12 +282,24 @@ export default function App() {
                           {msg.content}
                         </ReactMarkdown>
                       </div>
+                      {msg.role === 'assistant' && msg.content.includes("temporary connection issue") && (
+                        <button 
+                          onClick={() => {
+                            const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content;
+                            if (lastUserMsg) handleSend(lastUserMsg);
+                          }}
+                          className="mt-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-amber-600 hover:text-amber-700 transition-colors"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          Retry Request
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
                 {isLoading && (
                   <div className="flex gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-[#141414] text-white flex items-center justify-center animate-pulse">
+                    <div className="w-8 h-8 rounded-lg bg-[#0065cc] text-white flex items-center justify-center animate-pulse">
                       <Bot className="w-5 h-5" />
                     </div>
                     <div className="bg-white p-4 rounded-2xl shadow-sm flex gap-1 items-center">
@@ -295,7 +325,7 @@ export default function App() {
                   <div key={m.id} className="bg-white p-6 rounded-3xl border border-[#E5E5E5] hover:shadow-md transition-shadow group">
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-[10px] font-bold text-[#9E9E9E] uppercase tracking-widest">Module 0{m.id}</span>
-                      <ChevronRight className="w-4 h-4 text-[#D1D1D1] group-hover:text-[#141414] transition-colors" />
+                      <ChevronRight className="w-4 h-4 text-[#D1D1D1] group-hover:text-[#0065cc] transition-colors" />
                     </div>
                     <h3 className="text-xl font-bold mb-4">{m.title}</h3>
                     <div className="flex flex-wrap gap-2">
@@ -341,7 +371,7 @@ export default function App() {
                       <span className="text-[10px] font-bold text-[#9E9E9E] uppercase tracking-widest block">Week {item.w}</span>
                       <span className="text-xs text-[#4A4A4A]">{item.d}</span>
                     </div>
-                    <div className="flex-1 bg-white p-4 rounded-2xl border border-[#E5E5E5] group-hover:border-[#141414] transition-colors shadow-sm text-left">
+                    <div className="flex-1 bg-white p-4 rounded-2xl border border-[#E5E5E5] group-hover:border-[#0065cc] transition-colors shadow-sm text-left">
                       <div className="flex justify-between items-start gap-4">
                         <div>
                           <h4 className="font-bold text-sm mb-1">{item.t}</h4>
@@ -370,7 +400,7 @@ export default function App() {
                 exit={{ opacity: 0, x: -20 }}
                 className="max-w-4xl mx-auto space-y-8"
               >
-                <div className="bg-[#141414] text-white p-10 rounded-[40px] relative overflow-hidden">
+                <div className="bg-[#0065cc] text-white p-10 rounded-[40px] relative overflow-hidden">
                   <div className="relative z-10">
                     <h3 className="text-3xl font-bold mb-4">AI Chatbot Project</h3>
                     <p className="text-gray-400 max-w-xl leading-relaxed">
@@ -399,7 +429,7 @@ export default function App() {
                             <p className="text-sm font-bold">{item.label}</p>
                             <p className="text-[10px] text-[#9E9E9E] uppercase tracking-wider">Due {item.due}</p>
                           </div>
-                          <span className="text-lg font-black text-[#141414]">{item.weight}</span>
+                          <span className="text-lg font-black text-[#0065cc]">{item.weight}</span>
                         </div>
                       ))}
                     </div>
@@ -491,19 +521,19 @@ export default function App() {
               >
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-white p-6 rounded-3xl border border-[#E5E5E5]">
-                    <GraduationCap className="w-8 h-8 mb-4 text-[#141414]" />
+                    <GraduationCap className="w-8 h-8 mb-4 text-[#0065cc]" />
                     <h4 className="font-bold mb-2">Instructor</h4>
                     <p className="text-sm text-[#4A4A4A]">Dr. Cecilia Ying</p>
                     <p className="text-xs text-[#9E9E9E]">KRAN 534</p>
                   </div>
                   <div className="bg-white p-6 rounded-3xl border border-[#E5E5E5]">
-                    <RefreshCw className="w-8 h-8 mb-4 text-[#141414]" />
+                    <RefreshCw className="w-8 h-8 mb-4 text-[#0065cc]" />
                     <h4 className="font-bold mb-2">Office Hours</h4>
                     <p className="text-sm text-[#4A4A4A]">Friday 2:30 PM</p>
                     <p className="text-xs text-[#9E9E9E]">3:30 PM (or by appt)</p>
                   </div>
                   <div className="bg-white p-6 rounded-3xl border border-[#E5E5E5]">
-                    <FileText className="w-8 h-8 mb-4 text-[#141414]" />
+                    <FileText className="w-8 h-8 mb-4 text-[#0065cc]" />
                     <h4 className="font-bold mb-2">Grading</h4>
                     <p className="text-sm text-[#4A4A4A]">Labs: 30%</p>
                     <p className="text-xs text-[#9E9E9E]">Exams: 40% Total</p>
@@ -517,12 +547,12 @@ export default function App() {
                       <h4 className="font-bold text-sm mb-4 uppercase tracking-wider text-[#9E9E9E]">Lectures</h4>
                       <div className="space-y-3">
                         <div className="p-3 bg-[#F9F9F9] rounded-xl border border-[#E5E5E5]">
-                          <p className="text-xs font-bold text-[#141414]">Section 1 (34749)</p>
+                          <p className="text-xs font-bold text-[#0065cc]">Section 1 (34749)</p>
                           <p className="text-sm text-[#4A4A4A]">Friday 1:30 PM – 2:20 PM</p>
                           <p className="text-xs text-[#9E9E9E]">ME 1061</p>
                         </div>
                         <div className="p-3 bg-[#F9F9F9] rounded-xl border border-[#E5E5E5]">
-                          <p className="text-xs font-bold text-[#141414]">Section 6 (34911)</p>
+                          <p className="text-xs font-bold text-[#0065cc]">Section 6 (34911)</p>
                           <p className="text-sm text-[#4A4A4A]">Wed 12:30 PM – 1:20 PM</p>
                           <p className="text-xs text-[#9E9E9E]">WTHR 172</p>
                         </div>
@@ -542,12 +572,46 @@ export default function App() {
                           { s: "10", t: "Mon 11:30 AM", l: "KRAN 250", ta: "Orion, Shriya" },
                         ].map((r, i) => (
                           <div key={i} className="p-2.5 bg-[#F9F9F9] rounded-xl border border-[#E5E5E5]">
-                            <p className="text-[10px] font-bold text-[#141414]">Sec {r.s}</p>
+                            <p className="text-[10px] font-bold text-[#0065cc]">Sec {r.s}</p>
                             <p className="text-[11px] text-[#4A4A4A]">{r.t}</p>
                             <p className="text-[10px] text-[#9E9E9E]">{r.l}</p>
                             <p className="text-[9px] text-[#9E9E9E] italic mt-1">TA: {r.ta}</p>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-8 rounded-3xl border border-[#E5E5E5]">
+                  <h3 className="text-xl font-bold mb-6">How to Get Help</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex gap-3 items-start">
+                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#0065cc] font-bold text-xs">1</div>
+                        <p className="text-sm text-[#4A4A4A]">Try googling it.</p>
+                      </div>
+                      <div className="flex gap-3 items-start">
+                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#0065cc] font-bold text-xs">2</div>
+                        <p className="text-sm text-[#4A4A4A]">Check in with your lab buddy/classmates.</p>
+                      </div>
+                      <div className="flex gap-3 items-start">
+                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#0065cc] font-bold text-xs">3</div>
+                        <p className="text-sm text-[#4A4A4A]">Post your questions on the Brightspace discussion board.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex gap-3 items-start">
+                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#0065cc] font-bold text-xs">4</div>
+                        <p className="text-sm text-[#4A4A4A]">Check with your TA during recitation.</p>
+                      </div>
+                      <div className="flex gap-3 items-start">
+                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#0065cc] font-bold text-xs">5</div>
+                        <p className="text-sm text-[#4A4A4A]">Come to office hours (Friday 2:30 PM – 3:30 PM).</p>
+                      </div>
+                      <div className="flex gap-3 items-start">
+                        <div className="mt-1 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#0065cc] font-bold text-xs">6</div>
+                        <p className="text-sm text-[#4A4A4A]">Send an email to MGMT187@purdue.edu.</p>
                       </div>
                     </div>
                   </div>
@@ -586,12 +650,12 @@ export default function App() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder={tutorMode ? "Ask for practice questions or study help..." : "Ask about course content or logistics..."}
-                className="w-full bg-white border border-[#E5E5E5] rounded-2xl py-4 pl-6 pr-14 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#141414]/10 focus:border-[#141414] transition-all"
+                className="w-full bg-white border border-[#E5E5E5] rounded-2xl py-4 pl-6 pr-14 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#0065cc]/10 focus:border-[#0065cc] transition-all"
               />
               <button 
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={isLoading || !input.trim()}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-[#141414] text-white rounded-xl hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-[#0065cc] text-white rounded-xl hover:bg-[#333] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 <Send className="w-5 h-5" />
               </button>

@@ -8,19 +8,19 @@
 
 @layer base {
   body {
-    @apply bg-[#F5F5F5] text-[#141414] antialiased;
+    @apply bg-[#F5F5F5] text-[#0065cc] antialiased;
   }
 }
 
 /* Custom overrides for the prose class to match the app's aesthetic */
 .prose {
   --tw-prose-body: #4A4A4A;
-  --tw-prose-headings: #141414;
-  --tw-prose-bold: #141414;
+  --tw-prose-headings: #0065cc;
+  --tw-prose-bold: #0065cc;
   --tw-prose-bullets: #D1D1D1;
-  --tw-prose-quotes: #141414;
-  --tw-prose-code: #141414;
-  --tw-prose-links: #141414;
+  --tw-prose-quotes: #0065cc;
+  --tw-prose-code: #0065cc;
+  --tw-prose-links: #0065cc;
 }
 
 .prose-invert {
